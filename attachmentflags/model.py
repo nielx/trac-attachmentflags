@@ -10,7 +10,7 @@ from trac.attachment import Attachment
 from trac.util.datefmt import to_timestamp, utc
  
 class AttachmentFlags(object):
-    def __init__(self, env, attachment):
+    def __init__(self, env, attachment, db=None):
         if not isinstance(attachment, Attachment):
             raise TypeError
         self.attachment = attachment
@@ -19,7 +19,8 @@ class AttachmentFlags(object):
         self.__flags = {}
         self.__updatedflags = []
         
-        db = env.get_db_cnx()
+        if db == None:
+            db = env.get_db_cnx()
         cursor = db.cursor()
         cursor.execute("SELECT flag, value, updated_on, updated_by FROM attachmentflags WHERE "
                        "type=%s AND id=%s AND filename=%s", 

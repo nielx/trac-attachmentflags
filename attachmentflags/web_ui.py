@@ -82,11 +82,12 @@ class AttachmentFlagsModule(Component):
                         if data:
                             flags[flag] = data
                     
-                    attachment = Attachment(self.env, type, id, filename)
-                    attachmentflags = AttachmentFlags(self.env, attachment)
+                    db = self.env.get_db_cnx()
+                    attachment = Attachment(self.env, type, id, filename, db=db)
+                    attachmentflags = AttachmentFlags(self.env, attachment, db)
                     
                     for flag, value in flags.items():
-                        attachmentflags.setflag(flag, value, get_reporter_id(req, 'author'))
+                        attachmentflags.setflag(flag, value, get_reporter_id(req, 'author'), db)
                     attachmentflags.finishupdate()
                 else:
                     raise TypeError
