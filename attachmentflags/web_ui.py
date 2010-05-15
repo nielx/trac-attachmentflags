@@ -60,7 +60,7 @@ class AttachmentFlagsModule(Component):
  
     # IRequestFilter methods
     def pre_process_request(self, req, handler):
-        if req.path_info.startswith('/attachment/'):
+        if req.path_info.startswith('/attachment/') and 'ticket' in req.path_info:
             # Salvage flags for a new attachment. These will be stored
             # in attachment_added()
             action = req.args.get('action', 'view')
@@ -111,7 +111,7 @@ class AttachmentFlagsModule(Component):
 
     # ITemplateStreamFilter methods
     def filter_stream(self, req, method, filename, stream, data):
-        if filename == "attachment.html":
+        if filename == "attachment.html" and data["attachment"] and data["attachment"].parent_realm == "ticket":
             if data["mode"] == "new":
                 stream |= Transformer("//fieldset").after(self._generate_attachmentflags_fieldset(readonly=False))
             elif data["mode"] == "list":
