@@ -1,5 +1,5 @@
  #
- # Copyright 2009, Niels Sascha Reedijk <niels.reedijk@gmail.com>
+ # Copyright 2010, Niels Sascha Reedijk <niels.reedijk@gmail.com>
  # All rights reserved. Distributed under the terms of the MIT License.
  #
 
@@ -7,12 +7,15 @@ import datetime
 from pkg_resources import resource_filename
 from genshi.builder import tag
 from genshi.filters.transform import Transformer
+import urllib
 
 from trac.attachment import IAttachmentChangeListener
 from trac.core import *
 from trac.web.api import IRequestFilter
 from trac.web.chrome import ITemplateProvider, ITemplateStreamFilter, add_notice, add_script
 from trac.util.datefmt import to_timestamp, utc
+
+from attachmentflags.model import AttachmentFlags
 
 class AttachmentFlagsModule(Component):
     """Implements attachment flags for Trac's interface.
@@ -77,6 +80,14 @@ class AttachmentFlagsModule(Component):
         if filename == "attachment.html":
             if data["mode"] == "new":
                 stream |= Transformer("//fieldset").after(self._generate_attachmentflags_fieldset())
+            if data["mode"] == "list":
+                # strike-through the obsolete attachments
+                attachments = data["attachments"]["attachments"]
+                for attachment in attachments:
+                    flags = AttachmentFlags(self.env, attachment)
+                    if "obsolete" in flags:
+                        href = "/attachment/%s/%s/%s" % (attachment.parent_realm, attachment.parent_id, urllib.quote(attachment.filename))
+                        stream |= Transformer("//div[@id='attachments']/dl[@class='attachments']/dt/a[@href='" + href + "']").wrap('s')        
         return stream
     
     # Internal
