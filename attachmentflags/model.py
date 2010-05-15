@@ -16,16 +16,18 @@ class AttachmentFlags(object):
         
         db = env.get_db_cnx()
         cursor = db.cursor()
-        cursor.execute("SELECT flag, value FROM attachmentflags WHERE "
+        cursor.execute("SELECT flag, value, updated_on, updated_by FROM attachmentflags WHERE "
                        "type=%s AND id=%s AND filename=%s", 
                        (attachment.parent_realm, attachment.parent_id, attachment.filename))
-        for flag, value in cursor:
-            self.flags[flag] = value
+        for flag, value, updated_on, updated_by in cursor:
+            self.flags[flag] = {"value": value, 
+                                "updated_on": updated_on, 
+                                "updated_by": updated_by}
 
     def __contains__(self, item):
         return item in self.flags
     
-    def __get_item__(self, item):
+    def __getitem__(self, item):
         return self.flags[item]
     
     def __len__(self):

@@ -5,7 +5,7 @@
 
 import datetime
 from pkg_resources import resource_filename
-from genshi.builder import tag
+from genshi.builder import tag, Fragment
 from genshi.filters.transform import Transformer
 import urllib
 
@@ -13,8 +13,7 @@ from trac.attachment import IAttachmentChangeListener
 from trac.core import *
 from trac.web.api import IRequestFilter
 from trac.web.chrome import ITemplateProvider, ITemplateStreamFilter, add_notice, add_script
-from trac.util.datefmt import to_timestamp, utc
-
+from trac.util.datefmt import pretty_timedelta, format_datetime, to_timestamp, utc
 from attachmentflags.model import AttachmentFlags
 
 class AttachmentFlagsModule(Component):
@@ -80,22 +79,34 @@ class AttachmentFlagsModule(Component):
         if filename == "attachment.html":
             if data["mode"] == "new":
                 stream |= Transformer("//fieldset").after(self._generate_attachmentflags_fieldset())
-            if data["mode"] == "list":
-                # strike-through the obsolete attachments
+            elif data["mode"] == "list":
                 stream = self._filter_obsolete_attachments_from_stream(stream, data["attachments"]["attachments"])
+            elif data["mode"] == "view":
+                flags = AttachmentFlags(self.env, data["attachment"])
+                stream |= Transformer("//div[@id='preview']").after(self._generate_attachmentflags_fieldset(flags))
         if filename == "ticket.html" and "attachments" in data:
             stream = self._filter_obsolete_attachments_from_stream(stream, data["attachments"]["attachments"])
         return stream
     
     # Internal
-    def _generate_attachmentflags_fieldset(self):
-        return tag.fieldset(tag.legend("Attachment Flags") +  \
-                            tag.input("Patch", \
-                                      type='checkbox', id='flag_patch', \
-                                      name='flag_patch') + tag.br() + \
-                            tag.input("Obsolete", \
-                                      type='checkbox', id='flag_obsolete', \
-                                      name='flag_obsolete'))               
+    def _generate_attachmentflags_fieldset(self, current_flags=None):
+        fields = Fragment()
+        for flag in self.known_flags:
+            flagid = 'flag_' + flag
+            if current_flags and flag in current_flags:
+                date = datetime.datetime.fromtimestamp(current_flags[flag]["updated_on"],utc)
+                text = tag.span(tag.strong(flag), " set by ", 
+                                tag.em(current_flags[flag]["updated_by"]), ", ", tag.span(pretty_timedelta(date),
+                                                  title=format_datetime(date)), " ago")
+                fields += tag.input(text, \
+                                    type='checkbox', id=flagid, \
+                                    name=flagid, checked="checked") + tag.br()
+            else:
+                fields += tag.input(flag, \
+                                    type='checkbox', id=flagid, \
+                                    name=flagid) + tag.br()
+
+        return tag.fieldset(tag.legend("Attachment Flags") + fields)              
 
     def _filter_obsolete_attachments_from_stream(self, stream, attachments):
         for attachment in attachments:
