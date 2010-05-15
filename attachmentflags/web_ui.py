@@ -65,7 +65,9 @@ class AttachmentFlagsModule(Component):
             # in attachment_added()
             action = req.args.get('action', 'view')
             if req.method == 'POST' and action == "new":
-                req.perm.require('TICKET_APPEND')
+                # NOTE: no need to assert permissions: if it is not allowed
+                # then the actual attachment will never be added.
+                
                 # Salvage all attachment flags.
                 for flag in self.known_flags:
                     data = req.args.get('flag_' + flag)
