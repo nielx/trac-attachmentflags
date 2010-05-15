@@ -82,12 +82,9 @@ class AttachmentFlagsModule(Component):
                 stream |= Transformer("//fieldset").after(self._generate_attachmentflags_fieldset())
             if data["mode"] == "list":
                 # strike-through the obsolete attachments
-                attachments = data["attachments"]["attachments"]
-                for attachment in attachments:
-                    flags = AttachmentFlags(self.env, attachment)
-                    if "obsolete" in flags:
-                        href = "/attachment/%s/%s/%s" % (attachment.parent_realm, attachment.parent_id, urllib.quote(attachment.filename))
-                        stream |= Transformer("//div[@id='attachments']/dl[@class='attachments']/dt/a[@href='" + href + "']").wrap('s')        
+                stream = self._filter_obsolete_attachments_from_stream(stream, data["attachments"]["attachments"])
+        if filename == "ticket.html" and "attachments" in data:
+            stream = self._filter_obsolete_attachments_from_stream(stream, data["attachments"]["attachments"])
         return stream
     
     # Internal
@@ -98,4 +95,12 @@ class AttachmentFlagsModule(Component):
                                       name='flag_patch') + tag.br() + \
                             tag.input("Obsolete", \
                                       type='checkbox', id='flag_obsolete', \
-                                      name='flag_obsolete'))                                      
+                                      name='flag_obsolete'))               
+
+    def _filter_obsolete_attachments_from_stream(self, stream, attachments):
+        for attachment in attachments:
+            flags = AttachmentFlags(self.env, attachment)
+            if "obsolete" in flags:
+                href = "/attachment/%s/%s/%s" % (attachment.parent_realm, attachment.parent_id, urllib.quote(attachment.filename))
+                stream |= Transformer("//div[@id='attachments']/dl[@class='attachments']/dt/a[@href='" + href + "']").wrap('s')        
+        return stream                
