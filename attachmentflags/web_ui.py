@@ -7,12 +7,14 @@ import datetime
 from pkg_resources import resource_filename
 from genshi.builder import tag, Fragment
 from genshi.filters.transform import Transformer
+import re
 import urllib
 
-from trac.attachment import IAttachmentChangeListener
+from trac.attachment import IAttachmentChangeListener, Attachment
 from trac.core import *
 from trac.web.api import IRequestFilter
 from trac.web.chrome import ITemplateProvider, ITemplateStreamFilter, add_notice, add_script
+from trac.util import get_reporter_id
 from trac.util.datefmt import pretty_timedelta, format_datetime, to_timestamp, utc
 from attachmentflags.model import AttachmentFlags
 
@@ -59,7 +61,8 @@ class AttachmentFlagsModule(Component):
     # IRequestFilter methods
     def pre_process_request(self, req, handler):
         if req.path_info.startswith('/attachment/'):
-            # override the attachment's own routines here
+            # Salvage flags for a new attachment. These will be stored
+            # in attachment_added()
             action = req.args.get('action', 'view')
             if req.method == 'POST' and action == "new":
                 # Salvage all attachment flags.
@@ -67,6 +70,28 @@ class AttachmentFlagsModule(Component):
                     data = req.args.get('flag_' + flag)
                     if data:
                         self.salvaged_data[flag] = data
+            # Update flags
+            elif req.method == 'POST' and action == "update_flags":
+                match = re.match(r'/attachment/([^/]+)/([^/]+)/(.+)?$',req.path_info)
+                if match:
+                    type, id, filename = match.groups()
+                    
+                    flags = {}
+                    for flag in self.known_flags:
+                        data = req.args.get('flag_' + flag)
+                        if data:
+                            flags[flag] = data
+                    
+                    attachment = Attachment(self.env, type, id, filename)
+                    attachmentflags = AttachmentFlags(self.env, attachment)
+                    
+                    for flag, value in flags.items():
+                        attachmentflags.setflag(flag, value, get_reporter_id(req, 'author'))
+                    attachmentflags.finishupdate()
+                else:
+                    raise TypeError
+                
+                req.redirect(req.path_info)
 
         return handler
     
@@ -83,13 +108,13 @@ class AttachmentFlagsModule(Component):
                 stream = self._filter_obsolete_attachments_from_stream(stream, data["attachments"]["attachments"])
             elif data["mode"] == "view":
                 flags = AttachmentFlags(self.env, data["attachment"])
-                stream |= Transformer("//div[@id='preview']").after(self._generate_attachmentflags_fieldset(flags))
+                stream |= Transformer("//div[@id='preview']").after(self._generate_attachmentflags_fieldset(flags, True))
         if filename == "ticket.html" and "attachments" in data:
             stream = self._filter_obsolete_attachments_from_stream(stream, data["attachments"]["attachments"])
         return stream
     
     # Internal
-    def _generate_attachmentflags_fieldset(self, current_flags=None):
+    def _generate_attachmentflags_fieldset(self, current_flags=None, form=False):
         fields = Fragment()
         for flag in self.known_flags:
             flagid = 'flag_' + flag
@@ -105,8 +130,12 @@ class AttachmentFlagsModule(Component):
                 fields += tag.input(flag, \
                                     type='checkbox', id=flagid, \
                                     name=flagid) + tag.br()
-
-        return tag.fieldset(tag.legend("Attachment Flags") + fields)              
+        if form:
+            return tag.form(tag.fieldset(tag.legend("Attachment Flags") + fields,
+                                         tag.input(type="hidden", name="action", value="update_flags"),
+                                         tag.input(type="submit", value="Update flags")),  
+                            method="POST")
+        return tag.fieldset(tag.legend("Attachment Flags") + fields)
 
     def _filter_obsolete_attachments_from_stream(self, stream, attachments):
         for attachment in attachments:
