@@ -65,6 +65,7 @@ class AttachmentFlagsModule(Component):
             # in attachment_added()
             action = req.args.get('action', 'view')
             if req.method == 'POST' and action == "new":
+                req.perm.require('TICKET_APPEND')
                 # Salvage all attachment flags.
                 for flag in self.known_flags:
                     data = req.args.get('flag_' + flag)
@@ -86,8 +87,14 @@ class AttachmentFlagsModule(Component):
                     attachment = Attachment(self.env, type, id, filename, db=db)
                     attachmentflags = AttachmentFlags(self.env, attachment, db)
                     
+                    # Permission check: everybody can add flags to their own attachments
+                    # Else they need 'TICKET_MODIFY'
+                    
+                    if get_reporter_id(req) != attachment.author:
+                        req.perm.require('TICKET_MODIFY')
+                    
                     for flag, value in flags.items():
-                        attachmentflags.setflag(flag, value, get_reporter_id(req, 'author'), db)
+                        attachmentflags.setflag(flag, value, get_reporter_id(req), db)
                     attachmentflags.finishupdate()
                 else:
                     raise TypeError
@@ -104,18 +111,21 @@ class AttachmentFlagsModule(Component):
     def filter_stream(self, req, method, filename, stream, data):
         if filename == "attachment.html":
             if data["mode"] == "new":
-                stream |= Transformer("//fieldset").after(self._generate_attachmentflags_fieldset())
+                stream |= Transformer("//fieldset").after(self._generate_attachmentflags_fieldset(readonly=False))
             elif data["mode"] == "list":
                 stream = self._filter_obsolete_attachments_from_stream(stream, data["attachments"]["attachments"])
             elif data["mode"] == "view":
                 flags = AttachmentFlags(self.env, data["attachment"])
-                stream |= Transformer("//div[@id='preview']").after(self._generate_attachmentflags_fieldset(flags, True))
+                if 'TICKET_MODIFY' in req.perm or get_reporter_id(req) == data["attachment"].author:
+                    stream |= Transformer("//div[@id='preview']").after(self._generate_attachmentflags_fieldset(readonly=False, current_flags=flags, form=True))
+                else:
+                    stream |= Transformer("//div[@id='preview']").after(self._generate_attachmentflags_fieldset(current_flags=flags))
         if filename == "ticket.html" and "attachments" in data:
             stream = self._filter_obsolete_attachments_from_stream(stream, data["attachments"]["attachments"])
         return stream
     
     # Internal
-    def _generate_attachmentflags_fieldset(self, current_flags=None, form=False):
+    def _generate_attachmentflags_fieldset(self, readonly=True, current_flags=None, form=False):
         fields = Fragment()
         for flag in self.known_flags:
             flagid = 'flag_' + flag
@@ -124,14 +134,25 @@ class AttachmentFlagsModule(Component):
                 text = tag.span(tag.strong(flag), " set by ", 
                                 tag.em(current_flags[flag]["updated_by"]), ", ", tag.span(pretty_timedelta(date),
                                                   title=format_datetime(date)), " ago")
-                fields += tag.input(text, \
-                                    type='checkbox', id=flagid, \
-                                    name=flagid, checked="checked") + tag.br()
+                if readonly == True:
+                    fields += tag.input(text, \
+                                        type='checkbox', id=flagid, \
+                                        name=flagid, checked="checked",
+                                        disabled="true") + tag.br()
+                else:
+                    fields += tag.input(text, \
+                                        type='checkbox', id=flagid, \
+                                        name=flagid, checked="checked") + tag.br()
             else:
-                fields += tag.input(flag, \
-                                    type='checkbox', id=flagid, \
-                                    name=flagid) + tag.br()
-        if form:
+                if readonly == True:
+                    fields += tag.input(flag, \
+                                        type='checkbox', id=flagid, \
+                                        name=flagid, disabled="true") + tag.br()
+                else:
+                    fields += tag.input(flag, \
+                                        type='checkbox', id=flagid, \
+                                        name=flagid) + tag.br()
+        if form and not readonly:
             return tag.form(tag.fieldset(tag.legend("Attachment Flags") + fields,
                                          tag.input(type="hidden", name="action", value="update_flags"),
                                          tag.input(type="submit", value="Update flags")),  
