@@ -77,5 +77,6 @@ class AttachmentFlags(object):
                                "id=%s AND filename=%s AND flag=%s", 
                                (self.attachment.parent_realm, self.attachment.parent_id, 
                                 self.attachment.filename, flag))
+                del self.__flags[flag]
         db.commit()
-        
+        self.__updatedflags = []

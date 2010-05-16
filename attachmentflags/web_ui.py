@@ -12,6 +12,7 @@ import urllib
 
 from trac.attachment import IAttachmentChangeListener, Attachment
 from trac.core import *
+from trac.ticket.model import Ticket
 from trac.web.api import IRequestFilter
 from trac.web.chrome import ITemplateProvider, ITemplateStreamFilter, add_notice, add_script
 from trac.util import get_reporter_id
@@ -47,6 +48,12 @@ class AttachmentFlagsModule(Component):
                            "(%s,%s,%s,%s,%s,%s,%s,%s)", (attachment.parent_realm,
                            attachment.parent_id, attachment.filename, flag, value,
                            attachment.author, to_timestamp(attachment.date) , attachment.author))
+                
+        # Update patch flag of the ticket if needed
+        if "patch" in self.salvaged_data and not "obsolete" in self.salvaged_data:
+            ticket = Ticket(self.env, int(attachment.parent_id), db)
+            ticket["patch"] = "1"
+            ticket.save_changes(attachment.author, "", db=db)            
         db.commit()
     
     def attachment_deleted(self, attachment):
@@ -79,6 +86,9 @@ class AttachmentFlagsModule(Component):
                 if match:
                     type, id, filename = match.groups()
                     
+                    if type != "ticket":
+                        return handler
+                    
                     flags = {}
                     for flag in self.known_flags:
                         data = req.args.get('flag_' + flag)
@@ -98,8 +108,37 @@ class AttachmentFlagsModule(Component):
                     for flag, value in flags.items():
                         attachmentflags.setflag(flag, value, get_reporter_id(req), db)
                     attachmentflags.finishupdate()
-                else:
-                    raise TypeError
+                    
+                    # Update the patch field on the ticket
+                    cursorattachments = db.cursor()
+                    cursorattachments.execute("SELECT filename FROM attachment WHERE type=%s "
+                                              "AND id=%s", (attachment.parent_realm, attachment.parent_id))
+                    attachments = []
+                    for filename in cursorattachments: #I'm pretty sure we always end up with len>0
+                        attachments.append(filename)
+                    
+                    patchcount = 0
+                    for filename in attachments:
+                        has_patch = False
+                        cursorpatch = db.cursor()
+                        cursorpatch.execute("SELECT value FROM attachmentflags WHERE type='ticket' "
+                                            "AND flag='patch' AND id=%s AND filename=%s", (attachment.parent_id, filename))
+                        if cursorpatch.fetchone():
+                            # See whether the patch is obsoleted
+                            cursorobsolete = db.cursor()
+                            cursorobsolete.execute("SELECT filename FROM attachmentflags WHERE type='ticket' "
+                                                "AND flag='obsolete' AND id=%s AND filename=%s", (attachment.parent_id,filename))
+                            if not cursorobsolete.fetchone():
+                                has_patch = True
+                        if has_patch:
+                            patchcount += 1
+                                
+                    ticket = Ticket(self.env,int(attachment.parent_id), db)
+                    if patchcount > 0:
+                        ticket["patch"] = "1"
+                    else:
+                        ticket["patch"] = "0"
+                    ticket.save_changes(get_reporter_id(req), "")
                 
                 req.redirect(req.path_info)
 
