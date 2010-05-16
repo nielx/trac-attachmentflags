@@ -48,9 +48,9 @@ class AttachmentFlags(object):
         # It still needs to be added
         if flag not in self.__flags:
             cursor.execute("INSERT INTO attachmentflags VALUES "
-                           "(%s,%s,%s,%s,%s,%s,%s,%s)", (self.attachment.parent_realm,
+                           "(%s,%s,%s,%s,%s,%s,%s)", (self.attachment.parent_realm,
                            self.attachment.parent_id, self.attachment.filename, flag, value,
-                           author, timestamp, author))
+                           timestamp, author))
             self.__updatedflags.append(flag)
             db.commit()
 

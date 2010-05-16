@@ -14,7 +14,6 @@ tables = [
         Column('filename'),
         Column('flag'),
         Column('value'),
-        Column('requested_by'),
         Column('updated_on', type="int"),
         Column('updated_by'),
     ],

@@ -45,9 +45,9 @@ class AttachmentFlagsModule(Component):
         for flag, value in self.salvaged_data.items():
             cursor = db.cursor()
             cursor.execute("INSERT INTO attachmentflags VALUES "
-                           "(%s,%s,%s,%s,%s,%s,%s,%s)", (attachment.parent_realm,
+                           "(%s,%s,%s,%s,%s,%s,%s)", (attachment.parent_realm,
                            attachment.parent_id, attachment.filename, flag, value,
-                           attachment.author, to_timestamp(attachment.date) , attachment.author))
+                           to_timestamp(attachment.date) , attachment.author))
                 
         # Update patch flag of the ticket if needed
         if "patch" in self.salvaged_data and not "obsolete" in self.salvaged_data:
