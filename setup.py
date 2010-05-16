@@ -9,7 +9,7 @@ from setuptools import setup
 
 setup(
     name = 'TracAttachmentFlags',
-    version = '0.0.1',
+    version = '0.1.0',
     packages = ['attachmentflags'],
 #    package_data = { 'attachmentflags': ['htdocs/*.js'] },
 
@@ -21,9 +21,9 @@ setup(
     url = 'http://hg.haiku-os.org/trac-attachmentflags',
     classifiers = [
         'Framework :: Trac',
-        'Development Status :: 1 - Planning',
+        # 'Development Status :: 1 - Planning',
         # 'Development Status :: 2 - Pre-Alpha',
-        # 'Development Status :: 3 - Alpha',
+        'Development Status :: 3 - Alpha',
         # 'Development Status :: 4 - Beta',
         # 'Development Status :: 5 - Production/Stable',
         # 'Development Status :: 6 - Mature',
