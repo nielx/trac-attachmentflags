@@ -53,7 +53,7 @@ class AttachmentFlagsModule(Component):
         if "patch" in self.salvaged_data and not "obsolete" in self.salvaged_data:
             ticket = Ticket(self.env, int(attachment.parent_id), db)
             ticket["patch"] = "1"
-            ticket.save_changes(attachment.author, "", db=db)            
+            ticket.save_changes(attachment.author, None, db=db)            
         db.commit()
     
     def attachment_deleted(self, attachment):
@@ -138,7 +138,7 @@ class AttachmentFlagsModule(Component):
                         ticket["patch"] = "1"
                     else:
                         ticket["patch"] = "0"
-                    ticket.save_changes(get_reporter_id(req), "")
+                    ticket.save_changes(get_reporter_id(req), None)
                 
                 req.redirect(req.path_info)
 
