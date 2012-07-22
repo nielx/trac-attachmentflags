@@ -9,7 +9,7 @@ from trac.util.compat import set, sorted
 import db_default
 
 class AttachmentFlagsSystem(Component):
-    """Central functionality for the MasterTickets plugin."""
+    """Central functionality for the AttachmentFlags plugin."""
 
     implements(IEnvironmentSetupParticipant)
     
