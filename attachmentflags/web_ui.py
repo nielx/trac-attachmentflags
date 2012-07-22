@@ -161,11 +161,18 @@ class AttachmentFlagsModule(Component):
                     stream |= Transformer("//div[@id='preview']").after(self._generate_attachmentflags_fieldset(readonly=False, current_flags=flags, form=True))
                 else:
                     stream |= Transformer("//div[@id='preview']").after(self._generate_attachmentflags_fieldset(current_flags=flags))
-        if filename == "ticket.html" and "attachments" in data:
-            stream = self._filter_obsolete_attachments_from_stream(stream, data["attachments"]["attachments"])
+        if filename == "ticket.html":
+            if "attachments" in data:
+                stream = self._filter_obsolete_attachments_from_stream(stream, data["attachments"]["attachments"])
+            stream = self._disable_patch_field_edit(stream)
         return stream
     
     # Internal
+    def _disable_patch_field_edit(self, stream):
+        stream |= Transformer("//label[@for='field-patch']").wrap('strike')
+        stream |= Transformer("//input[@id='field-patch']").attr('disabled','disabled')
+        return stream
+        
     def _generate_attachmentflags_fieldset(self, readonly=True, current_flags=None, form=False):
         fields = Fragment()
         for flag in self.known_flags:
