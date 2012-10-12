@@ -169,14 +169,18 @@ class AttachmentFlagsModule(Component):
 
             buffer = StreamBuffer()
             #stream |= Transformer("//input[@id='field-patch']").attr('disabled','disabled')
-            # Copy input to buffer then disable original
-            stream |= Transformer('//input[@id="field-patch"]').copy(buffer) \
-                .after(buffer).attr("disabled","disabled")
+            # Copy a checked box to buffer then disable original
+            stream |= Transformer('//input[@id="field-patch" and (@checked)]')\
+                .copy(buffer).after(buffer).attr("disabled","disabled")
             # Change new element to hidden field instead of checkbox and
             # remove check
             stream |= Transformer('//input[@id="field-patch" and not (@disabled) \
                                    and (@checked) and @type="checkbox"]') \
                 .attr("type","hidden").attr("checked",None)
+            # Disable any non-checked boxes
+            stream = stream | Transformer('//*[@id="field-patch" and not \
+                                           (@checked)]')\
+                .attr("disabled", "disabled")
         
         
         if filename == "query.html":
