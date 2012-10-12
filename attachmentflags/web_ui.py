@@ -6,7 +6,7 @@
 import datetime
 from pkg_resources import resource_filename
 from genshi.builder import tag, Fragment
-from genshi.filters.transform import Transformer
+from genshi.filters.transform import Transformer, StreamBuffer
 import re
 import urllib
 
@@ -166,7 +166,18 @@ class AttachmentFlagsModule(Component):
             if "attachments" in data:
                 stream = self._filter_obsolete_attachments_from_stream(stream, data["attachments"]["attachments"])
             stream |= Transformer("//label[@for='field-patch']").wrap('strike')
-            stream |= Transformer("//input[@id='field-patch']").attr('disabled','disabled')
+
+            buffer = StreamBuffer()
+            #stream |= Transformer("//input[@id='field-patch']").attr('disabled','disabled')
+            # Copy input to buffer then disable original
+            stream |= Transformer('//input[@id="field-patch"]').copy(buffer) \
+                .after(buffer).attr("disabled","disabled")
+            # Change new element to hidden field instead of checkbox and
+            # remove check
+            stream |= Transformer('//input[@id="field-patch" and not (@disabled) \
+                                   and (@checked) and @type="checkbox"]') \
+                .attr("type","hidden").attr("checked",None)
+        
         
         if filename == "query.html":
             # Filter the patch field from the Trac 1.0 batch modify utility
