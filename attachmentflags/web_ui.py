@@ -1,10 +1,9 @@
  #
- # Copyright 2010, Niels Sascha Reedijk <niels.reedijk@gmail.com>
+ # Copyright 2010-2017, Niels Sascha Reedijk <niels.reedijk@gmail.com>
  # All rights reserved. Distributed under the terms of the MIT License.
  #
 
 import datetime
-from pkg_resources import resource_filename
 from genshi.builder import tag, Fragment
 from genshi.filters.transform import Transformer, StreamBuffer
 import re
@@ -14,7 +13,7 @@ from trac.attachment import IAttachmentChangeListener, Attachment
 from trac.core import *
 from trac.ticket.model import Ticket
 from trac.web.api import IRequestFilter
-from trac.web.chrome import ITemplateProvider, ITemplateStreamFilter, add_notice, add_script
+from trac.web.chrome import ITemplateStreamFilter
 from trac.util import get_reporter_id
 from trac.util.datefmt import pretty_timedelta, format_datetime, to_timestamp, utc
 from attachmentflags.model import AttachmentFlags
@@ -40,31 +39,28 @@ class AttachmentFlagsModule(Component):
         if len(self.salvaged_data) == 0:
             return
         
-        db = self.env.get_db_cnx()
-        cursor = db.cursor()
-        for flag, value in self.salvaged_data.items():
-            cursor = db.cursor()
-            cursor.execute("INSERT INTO attachmentflags VALUES "
-                           "(%s,%s,%s,%s,%s,%s,%s)", (attachment.parent_realm,
-                           attachment.parent_id, attachment.filename, flag, value,
-                           to_timestamp(attachment.date) , attachment.author))
-                
+        with self.env.db_transaction as db:
+            for flag, value in self.salvaged_data.items():
+                cursor = db.cursor()
+                cursor.execute("INSERT INTO attachmentflags VALUES "
+                               "(%s,%s,%s,%s,%s,%s,%s)", (attachment.parent_realm,
+                               attachment.parent_id, attachment.filename, flag, value,
+                               to_timestamp(attachment.date) , attachment.author))
+
         # Update patch flag of the ticket if needed
         if "patch" in self.salvaged_data and not "obsolete" in self.salvaged_data:
-            ticket = Ticket(self.env, int(attachment.parent_id), db)
+            ticket = Ticket(self.env, int(attachment.parent_id))
             ticket["patch"] = "1"
-            ticket.save_changes(attachment.author, None, db=db)            
-        db.commit()
-    
+            ticket.save_changes(attachment.author, None)
+
     def attachment_deleted(self, attachment):
         """Called when an attachment is deleted."""
-        db = self.env.get_db_cnx()
-        cursor = db.cursor()
-        cursor.execute("DELETE FROM attachmentflags WHERE type=%s AND id=%s "
-                       "AND filename=%s", (attachment.parent_realm, attachment.parent_id,
-                                           attachment.filename))
-        db.commit()
- 
+        with self.env.db_transaction as db:
+            cursor = db.cursor()
+            cursor.execute("DELETE FROM attachmentflags WHERE type=%s AND id=%s "
+                           "AND filename=%s", (attachment.parent_realm, attachment.parent_id,
+                                               attachment.filename))
+
     # IRequestFilter methods
     def pre_process_request(self, req, handler):
         if req.path_info.startswith('/attachment/') and 'ticket' in req.path_info:
@@ -95,9 +91,8 @@ class AttachmentFlagsModule(Component):
                         if data:
                             flags[flag] = data
                     
-                    db = self.env.get_db_cnx()
-                    attachment = Attachment(self.env, type, id, filename, db=db)
-                    attachmentflags = AttachmentFlags(self.env, attachment, db)
+                    attachment = Attachment(self.env, type, id, filename)
+                    attachmentflags = AttachmentFlags(self.env, attachment)
                     
                     # Permission check: everybody can add flags to their own attachments
                     # Else they need 'TICKET_MODIFY'
@@ -106,41 +101,42 @@ class AttachmentFlagsModule(Component):
                         req.perm.require('TICKET_MODIFY')
                     
                     for flag, value in flags.items():
-                        attachmentflags.setflag(flag, value, get_reporter_id(req), db)
+                        attachmentflags.setflag(flag, value, get_reporter_id(req))
                     attachmentflags.finishupdate()
                     
                     # Update the patch field on the ticket
-                    cursorattachments = db.cursor()
-                    cursorattachments.execute("SELECT filename FROM attachment WHERE type=%s "
-                                              "AND id=%s", (attachment.parent_realm, attachment.parent_id))
-                    attachments = []
-                    for filename in cursorattachments: #I'm pretty sure we always end up with len>0
-                        attachments.append(filename[0])
+                    with self.env.db_query as db:
+                        cursorattachments = db.cursor()
+                        cursorattachments.execute("SELECT filename FROM attachment WHERE type=%s "
+                                                  "AND id=%s", (attachment.parent_realm, attachment.parent_id))
+                        attachments = []
+                        for filename in cursorattachments: #I'm pretty sure we always end up with len>0
+                            attachments.append(filename[0])
                     
-                    patchcount = 0
-                    for filename in attachments:
-                        has_patch = False
-                        cursorpatch = db.cursor()
-                        cursorpatch.execute("SELECT value FROM attachmentflags WHERE type='ticket' "
-                                            "AND flag='patch' AND id=%s AND filename=%s", (attachment.parent_id, filename))
-                        if cursorpatch.fetchone():
-                            # See whether the patch is obsoleted
-                            cursorobsolete = db.cursor()
-                            cursorobsolete.execute("SELECT filename FROM attachmentflags WHERE type='ticket' "
-                                                "AND flag='obsolete' AND id=%s AND filename=%s", (attachment.parent_id,filename))
-                            if not cursorobsolete.fetchone():
-                                has_patch = True
-                        if has_patch:
-                            patchcount += 1
+                        patchcount = 0
+                        for filename in attachments:
+                            has_patch = False
+                            cursorpatch = db.cursor()
+                            cursorpatch.execute("SELECT value FROM attachmentflags WHERE type='ticket' "
+                                                "AND flag='patch' AND id=%s AND filename=%s", (attachment.parent_id, filename))
+                            if cursorpatch.fetchone():
+                                # See whether the patch is obsoleted
+                                cursorobsolete = db.cursor()
+                                cursorobsolete.execute("SELECT filename FROM attachmentflags WHERE type='ticket' "
+                                                    "AND flag='obsolete' AND id=%s AND filename=%s", (attachment.parent_id,filename))
+                                if not cursorobsolete.fetchone():
+                                    has_patch = True
+                            if has_patch:
+                                patchcount += 1
                                 
-                    ticket = Ticket(self.env,int(attachment.parent_id), db)
-                    if patchcount > 0:
-                        ticket["patch"] = "1"
-                    else:
-                        ticket["patch"] = "0"
-                    ticket.save_changes(get_reporter_id(req), None)
+                        ticket = Ticket(self.env,int(attachment.parent_id))
+                        if patchcount > 0:
+                            ticket["patch"] = "1"
+                        else:
+                            ticket["patch"] = "0"
+                        ticket.save_changes(get_reporter_id(req), None)
                 
-                req.redirect(req.path_info)
+                req.redirect(req.href.ticket(int(attachment.parent_id)))
 
         return handler
     
