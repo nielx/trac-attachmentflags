@@ -226,5 +226,5 @@ class AttachmentFlagsModule(Component):
             flags = AttachmentFlags(self.env, attachment)
             if "obsolete" in flags:
                 href = "/attachment/%s/%s/%s" % (attachment.parent_realm, attachment.parent_id, urllib.quote(attachment.filename))
-                stream |= Transformer("//div[@id='attachments']/div/dl[@class='attachments']/dt/a[@href='" + href + "']").wrap('s')        
+                stream |= Transformer("//div[@id='attachments']/div[@class='attachments']/dl[@class='attachments']/dt/a[contains(@href, '" + href + "')]").wrap('s')
         return stream                

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
  #
- # Copyright 2009, Niels Sascha Reedijk <niels.reedijk@gmail.com>
+ # Copyright 2009-2017, Niels Sascha Reedijk <niels.reedijk@gmail.com>
  # All rights reserved. Distributed under the terms of the MIT License.
  #
 
@@ -9,7 +9,7 @@ from setuptools import setup
 
 setup(
     name = 'TracAttachmentFlags',
-    version = '0.1.3',
+    version = '0.2.0',
     packages = ['attachmentflags'],
 #    package_data = { 'attachmentflags': ['htdocs/*.js'] },
 
@@ -35,7 +35,7 @@ setup(
         'Programming Language :: Python',
     ],
     
-    install_requires = ['Trac>=0.12', 'Genshi>=0.6'],
+    install_requires = ['Trac>=1.2', 'Genshi>=0.6'],
 
     entry_points = {
         'trac.plugins': [
