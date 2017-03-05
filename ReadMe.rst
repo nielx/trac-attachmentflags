@@ -1,9 +1,8 @@
 Attachment Flags in Trac
 ========================
 
-The current version works both on Trac 0.12 and Trac 1.0. The plugin is
-developed and maintained for the `Haiku issue tracker 
-<https://dev.haiku-os.org/>`_.
+The current version works on Trac 1.2. The plugin is developed and maintained
+for the `Haiku issue tracker <https://dev.haiku-os.org/>`_.
 
 What is it?
 -----------
