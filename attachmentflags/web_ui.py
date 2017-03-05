@@ -146,12 +146,12 @@ class AttachmentFlagsModule(Component):
 
     # ITemplateStreamFilter methods
     def filter_stream(self, req, method, filename, stream, data):
-        if filename == "attachment.html" and data["attachment"] and data["attachment"].parent_realm == "ticket":
-            if data["mode"] == "new":
+        if filename == "attachment.html":
+            if data["mode"] == "new" and data["attachment"].parent_realm == "ticket":
                 stream |= Transformer("//fieldset").after(self._generate_attachmentflags_fieldset(readonly=False))
-            elif data["mode"] == "list":
+            elif data["mode"] == "list" and data["attachments"] and data["attachments"]["parent"].realm == "ticket":
                 stream = self._filter_obsolete_attachments_from_stream(stream, data["attachments"]["attachments"])
-            elif data["mode"] == "view":
+            elif data["mode"] == "view" and data["attachment"].parent_realm == "ticket":
                 flags = AttachmentFlags(self.env, data["attachment"])
                 if 'TICKET_MODIFY' in req.perm or get_reporter_id(req) == data["attachment"].author:
                     stream |= Transformer("//div[@id='preview']").after(self._generate_attachmentflags_fieldset(readonly=False, current_flags=flags, form=True))
